@@ -16,11 +16,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    // 1. Fetch content with a descriptive User-Agent to avoid 429 blocks
+    // 1. Fetch content with browser-like headers to bypass bot detection
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "URL2EPUB/1.0 (https://yourdomain.com; contact@yourdomain.com) Bot/1.0",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
       },
     });
 
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
 
     const html = await response.text();
 
-    // 2. Extract "Reader Mode" content
+    // 2. Extract "Reader Mode" content using Readability
     const dom = new JSDOM(html, { url });
     const reader = new Readability(dom.window.document);
     const article = reader.parse();
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
     const author = article.byline || new URL(url).hostname;
 
     // 3. Generate EPUB in memory
-    // ignoreFailedDownloads: true ensures that blocked images don't crash the generation
+    // ignoreFailedDownloads ensures blocked images don't crash the process
     const epubBuffer = await epub(
       { 
         title, 
@@ -58,14 +60,14 @@ export async function POST(req: Request) {
       ]
     );
 
-    // 4. Upload to Vercel Blob
+    // 4. Upload the generated Buffer to Vercel Blob
     const blob = await put(`${title}.epub`, epubBuffer, {
       access: "public",
       contentType: "application/epub+zip",
       addRandomSuffix: true,
     });
 
-    // Return the key expected by your frontend
+    // 5. Return the downloadUrl expected by the frontend
     return NextResponse.json({ downloadUrl: blob.url });
 
   } catch (error: any) {
