@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.36.3",
     "@vercel/blob": "^2.3.0",
     "epub-gen-memory": "^1.1.2",
     "epub-maker": "^1.2.0",

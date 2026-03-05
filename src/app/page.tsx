@@ -6,8 +6,11 @@ export default function Home() {
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState<string>('');
   const [downloadUrl, setDownloadUrl] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
   async function onGenerate() {
+    if (loading) return;
+    setLoading(true);
     setStatus('Generating…');
     setDownloadUrl('');
 
@@ -25,9 +28,11 @@ export default function Home() {
       }
 
       setDownloadUrl(data.downloadUrl);
-      setStatus('Done ✅');
+      setStatus(data.cached ? 'Done ✅ (from cache)' : 'Done ✅');
     } catch (e: any) {
       setStatus(`Error: ${e.message}`);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -42,6 +47,7 @@ export default function Home() {
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onGenerate()}
           placeholder="https://example.com/article"
           style={{
             flex: 1,
@@ -53,15 +59,17 @@ export default function Home() {
         />
         <button
           onClick={onGenerate}
+          disabled={loading}
           style={{
             padding: '12px 16px',
             fontSize: 16,
             borderRadius: 10,
             border: '1px solid #ddd',
-            cursor: 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : 1,
           }}
         >
-          Generate
+          {loading ? 'Generating…' : 'Generate'}
         </button>
       </div>
 

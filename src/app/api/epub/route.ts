@@ -2,7 +2,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { put, list } from "@vercel/blob";
+import { createHash } from "crypto";
 import { parseHTML } from "linkedom"; // Lighter and modern alternative to jsdom
 import { Readability } from "@mozilla/readability";
 import epub from "epub-gen-memory";
@@ -21,7 +22,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    // 1. Fetch content with browser-like headers
+    // 1. Check cache — same URL always maps to the same blob key
+    const urlHash = createHash("sha256").update(url).digest("hex").slice(0, 16);
+    const cacheKey = `epub-cache/${urlHash}.epub`;
+
+    const { blobs } = await list({ prefix: cacheKey });
+    if (blobs.length > 0) {
+      return NextResponse.json({ downloadUrl: blobs[0].url, cached: true });
+    }
+
+    // 2. Fetch content with browser-like headers
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
@@ -36,10 +46,10 @@ export async function POST(req: Request) {
 
     const html = await response.text();
 
-    // 2. Parse HTML using linkedom instead of jsdom to avoid ESM errors
+    // 3. Parse HTML using linkedom instead of jsdom to avoid ESM errors
     const { document } = parseHTML(html);
-    
-    // 3. Extract content using Readability
+
+    // 4. Extract content using Readability
     const reader = new Readability(document);
     const article = reader.parse();
 
@@ -50,7 +60,7 @@ export async function POST(req: Request) {
     const title = sanitize(article.title || "document").slice(0, 100);
     const author = article.byline || new URL(url).hostname;
 
-    // 4. Generate EPUB in memory
+    // 5. Generate EPUB in memory
     const epubBuffer = await epub(
       { 
         title, 
@@ -65,14 +75,14 @@ export async function POST(req: Request) {
       ]
     );
 
-    // 5. Upload to Vercel Blob
-    const blob = await put(`${title}.epub`, epubBuffer, {
+    // 5. Upload to Vercel Blob with deterministic key for future cache hits
+    const blob = await put(cacheKey, epubBuffer, {
       access: "public",
       contentType: "application/epub+zip",
-      addRandomSuffix: true,
+      addRandomSuffix: false,
     });
 
-    return NextResponse.json({ downloadUrl: blob.url });
+    return NextResponse.json({ downloadUrl: blob.url, cached: false });
 
   } catch (error: any) {
     console.error("CONVERSION ERROR:", error.message);
