@@ -22,13 +22,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    // 1. Check cache — same URL always maps to the same blob key
+    // 1. Check cache — same URL always maps to the same blob prefix
     const urlHash = createHash("sha256").update(url).digest("hex").slice(0, 16);
-    const cacheKey = `epub-cache/${urlHash}.epub`;
 
-    const { blobs } = await list({ prefix: cacheKey });
+    const { blobs } = await list({ prefix: `epub-cache/${urlHash}/` });
     if (blobs.length > 0) {
-      return NextResponse.json({ downloadUrl: blobs[0].url, cached: true });
+      const cachedTitle = decodeURIComponent(
+        blobs[0].pathname.split("/").pop()?.replace(".epub", "") ?? ""
+      );
+      return NextResponse.json({ downloadUrl: blobs[0].url, title: cachedTitle, cached: true });
     }
 
     // 2. Fetch content with browser-like headers
@@ -76,13 +78,14 @@ export async function POST(req: Request) {
     );
 
     // 5. Upload to Vercel Blob with deterministic key for future cache hits
+    const cacheKey = `epub-cache/${urlHash}/${encodeURIComponent(title)}.epub`;
     const blob = await put(cacheKey, epubBuffer, {
       access: "public",
       contentType: "application/epub+zip",
       addRandomSuffix: false,
     });
 
-    return NextResponse.json({ downloadUrl: blob.url, cached: false });
+    return NextResponse.json({ downloadUrl: blob.url, title, cached: false });
 
   } catch (error: any) {
     console.error("CONVERSION ERROR:", error.message);
