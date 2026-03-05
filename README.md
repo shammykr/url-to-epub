@@ -25,6 +25,9 @@ Most "Send to Kindle" tools struggle with modern web protections. This project w
 - **Browser Mimicry:** Implements advanced headers to ensure high success rates across different domains.
 - **In-Memory Generation:** Creates EPUBs entirely in RAM using `epub-gen-memory`, avoiding slow disk I/O and permission issues.
 - **Vercel Blob Integration:** Seamlessly uploads generated files to the cloud for easy, one-click downloading.
+- **URL Deduplication Cache:** SHA-256 hashes each URL to a deterministic Blob key — converting the same URL twice returns the cached file instantly.
+- **Rate Limiting:** 5 requests per minute per IP via Upstash Redis middleware, protecting against abuse.
+- **Conversion History:** The last 10 conversions are saved in the browser's `localStorage` with title, URL, and timestamp for easy re-downloading.
 
 ---
 
@@ -32,12 +35,13 @@ Most "Send to Kindle" tools struggle with modern web protections. This project w
 
 | Tool | Purpose |
 |---|---|
-| **Next.js 15** | React framework for the frontend and API routes. |
+| **Next.js 16** | React framework for the frontend and API routes. |
 | **linkedom** | Lightweight DOM parser that avoids CommonJS/ESM conflict errors. |
 | **Readability** | The engine behind Firefox's "Reader View" for content extraction. |
 | **epub-gen-memory** | Fast, TypeScript-ready EPUB generator. |
 | **Vercel Blob** | Scalable object storage for hosting the generated files. |
-| **Tailwind CSS** | Utility-first CSS for a clean, responsive UI. |
+| **Tailwind CSS v4** | Utility-first CSS for a clean, responsive UI. |
+| **Upstash Redis** | Serverless Redis for per-IP rate limiting via Next.js middleware. |
 
 ---
 
@@ -46,7 +50,8 @@ Most "Send to Kindle" tools struggle with modern web protections. This project w
 ### 1. Prerequisites
 
 - Node.js 18+
-- A Vercel Blob read/write token
+- A [Vercel Blob](https://vercel.com/storage/blob) store (for file storage)
+- An [Upstash Redis](https://console.upstash.com) database (for rate limiting)
 
 ### 2. Installation
 
@@ -61,7 +66,12 @@ npm install
 Create a `.env.local` file in the project root:
 
 ```env
+# Vercel Blob — create a store at vercel.com/storage/blob
 BLOB_READ_WRITE_TOKEN=your_vercel_blob_token_here
+
+# Upstash Redis — create a database at console.upstash.com → REST API tab
+UPSTASH_REDIS_REST_URL=https://your-db.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_upstash_token_here
 ```
 
 ### 4. Start Developing
